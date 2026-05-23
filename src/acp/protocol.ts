@@ -155,6 +155,70 @@ export const ERR_INVALID_REQUEST = -32600;
 export const ERR_METHOD_NOT_FOUND = -32601;
 export const ERR_INVALID_PARAMS = -32602;
 export const ERR_INTERNAL = -32603;
+export const ERR_RESOURCE_NOT_FOUND = -32002;
+
+// fs types
+
+export interface ReadTextFileParams {
+  path: string;
+  line?: number;
+  limit?: number;
+}
+
+export interface ReadTextFileResult {
+  content: string;
+  uri: string;
+}
+
+export interface WriteTextFileParams {
+  path: string;
+  content: string;
+}
+
+export interface WriteTextFileResult {
+  uri: string;
+}
+
+// terminal types
+
+export interface CreateTerminalParams {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
+export interface CreateTerminalResult {
+  terminalId: string;
+}
+
+export interface TerminalOutputParams {
+  terminalId: string;
+}
+
+export interface TerminalOutputResult {
+  output: string;
+}
+
+export interface WaitForTerminalExitParams {
+  terminalId: string;
+}
+
+export interface WaitForTerminalExitResult {
+  exitCode: number;
+}
+
+export interface KillTerminalParams {
+  terminalId: string;
+}
+
+export type KillTerminalResult = Record<string, never>;
+
+export interface ReleaseTerminalParams {
+  terminalId: string;
+}
+
+export type ReleaseTerminalResult = Record<string, never>;
 
 /** Extract the user prompt text out of ACP content blocks. Resource blocks contribute their inline `text` if present. */
 export function flattenPrompt(blocks: ContentBlock[]): string {
