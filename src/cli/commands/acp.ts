@@ -302,7 +302,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
           }
           for (const kev of session.eventizer.consume(ev, session.ctx)) {
             dispatchKernelEvent(server, session.id, kev);
-            if (kev.type === "error") stopReason = "error";
+            // error is surfaced via session/update notification above
           }
         }
       });
@@ -315,7 +315,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
           content: { type: "text", text: `\n\n[error] ${message}` },
         },
       } satisfies SessionUpdateParams);
-      stopReason = "error";
+      stopReason = "end_turn";
     } finally {
       session.aborter = null;
     }
