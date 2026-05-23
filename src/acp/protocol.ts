@@ -156,6 +156,43 @@ export const ERR_METHOD_NOT_FOUND = -32601;
 export const ERR_INVALID_PARAMS = -32602;
 export const ERR_INTERNAL = -32603;
 
+export interface SessionLoadParams {
+  sessionId: string;
+}
+
+export type SessionLoadResult = Record<string, never>;
+
+export interface SessionResumeParams {
+  sessionId: string;
+}
+
+export type SessionResumeResult = Record<string, never>;
+
+export interface AuthenticateParams {
+  method?: string;
+}
+
+export type AuthenticateResult = Record<string, never>;
+
+export type LogoutParams = Record<string, never>;
+
+export type LogoutResult = Record<string, never>;
+
+export interface SessionSetModeParams {
+  sessionId: string;
+  mode: string;
+}
+
+export type SessionSetModeResult = Record<string, never>;
+
+export interface SessionSetConfigOptionParams {
+  sessionId: string;
+  key: string;
+  value: unknown;
+}
+
+export type SessionSetConfigOptionResult = Record<string, never>;
+
 /** Extract the user prompt text out of ACP content blocks. Resource blocks contribute their inline `text` if present. */
 export function flattenPrompt(blocks: ContentBlock[]): string {
   const parts: string[] = [];

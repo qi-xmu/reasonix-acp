@@ -5,6 +5,7 @@ import { type WriteStream, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { dispatchKernelEvent } from "../../acp/dispatch.js";
 import { requestPermissionForGate } from "../../acp/gates.js";
+import { registerStubHandlers } from "../../acp/handlers/stubs.js";
 import {
   ACP_PROTOCOL_VERSION,
   type ContentBlock,
@@ -326,6 +327,8 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
     const session = params?.sessionId ? sessions.get(params.sessionId) : undefined;
     session?.aborter?.abort();
   });
+
+  registerStubHandlers(server);
 
   try {
     await server.done();
