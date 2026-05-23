@@ -114,7 +114,11 @@ export class AcpServer {
         const result = await handler(msg.params);
         this.write({ jsonrpc: "2.0", id, result });
       } catch (err) {
-        this.writeError(id, ERR_INTERNAL, (err as Error).message);
+        const code =
+          typeof (err as { code?: number }).code === "number"
+            ? (err as { code: number }).code
+            : ERR_INTERNAL;
+        this.writeError(id, code, (err as Error).message);
       }
       return;
     }
