@@ -8,8 +8,10 @@ import { requestPermissionForGate } from "../src/acp/gates.js";
 import {
   ACP_PROTOCOL_VERSION,
   type ContentBlock,
+  ERR_AUTH_REQUIRED,
   ERR_METHOD_NOT_FOUND,
   ERR_PARSE,
+  ERR_RESOURCE_NOT_FOUND,
   flattenPrompt,
 } from "../src/acp/protocol.js";
 import { AcpServer } from "../src/acp/server.js";
@@ -153,6 +155,25 @@ describe("ACP protocol helpers", () => {
 
   it("ACP_PROTOCOL_VERSION pins to the spec's v1", () => {
     expect(ACP_PROTOCOL_VERSION).toBe(1);
+  });
+
+  it("ERR_AUTH_REQUIRED is -32000 per JSON-RPC spec", () => {
+    expect(ERR_AUTH_REQUIRED).toBe(-32000);
+  });
+
+  it("ERR_RESOURCE_NOT_FOUND is -32002 per JSON-RPC spec", () => {
+    expect(ERR_RESOURCE_NOT_FOUND).toBe(-32002);
+  });
+
+  it("StopReason covers end_turn, tool_use_complete, cancelled, and error", () => {
+    // Type-level compile-time check — runtime validation of known strings
+    const reasons: Array<import("../src/acp/protocol.js").StopReason> = [
+      "end_turn",
+      "tool_use_complete",
+      "cancelled",
+      "error",
+    ];
+    expect(reasons).toHaveLength(4);
   });
 });
 

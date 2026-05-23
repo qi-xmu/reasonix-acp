@@ -155,6 +155,8 @@ export const ERR_INVALID_REQUEST = -32600;
 export const ERR_METHOD_NOT_FOUND = -32601;
 export const ERR_INVALID_PARAMS = -32602;
 export const ERR_INTERNAL = -32603;
+export const ERR_AUTH_REQUIRED = -32000;
+export const ERR_RESOURCE_NOT_FOUND = -32002;
 
 /** Extract the user prompt text out of ACP content blocks. Resource blocks contribute their inline `text` if present. */
 export function flattenPrompt(blocks: ContentBlock[]): string {
