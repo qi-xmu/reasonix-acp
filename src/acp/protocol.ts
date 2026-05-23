@@ -122,6 +122,27 @@ export interface SessionCancelParams {
   sessionId: string;
 }
 
+export interface SessionCloseParams {
+  sessionId: string;
+}
+
+// biome-ignore lint/suspicious/noEmptyInterface: empty result is intentional for idempotent close
+export interface SessionCloseResult {}
+
+// biome-ignore lint/suspicious/noEmptyInterface: empty params is intentional
+export interface SessionListParams {}
+
+export interface SessionInfo {
+  sessionId: string;
+  cwd: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface SessionListResult {
+  sessions: SessionInfo[];
+}
+
 export type PermissionOptionKind = "allow_once" | "allow_always" | "reject_once" | "reject_always";
 
 export interface PermissionOption {
