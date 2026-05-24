@@ -1,11 +1,41 @@
 /** Map kernel events (model.delta / tool.preparing|intent|result) to ACP session/update notifications. */
 
 import { toolKindFor } from "@reasonix/core-utils";
+import { SLASH_COMMANDS } from "../cli/ui/slash/commands.js";
 import type { Event as KernelEvent } from "../core/events.js";
 import type { SessionUpdateParams } from "./protocol.js";
 import type { AcpServer } from "./server.js";
 export { toolKindFor } from "@reasonix/core-utils";
 export type { AcpToolKind } from "@reasonix/core-utils";
+
+/** Send `available_commands_update` notification to advertise slash commands and skills.
+ *  Skills appear as first-class commands (e.g. `/pdf`) taking precedence over built-in
+ *  slash commands with the same name. */
+export function sendAvailableCommands(
+  server: AcpServer,
+  sessionId: string,
+  skills: ReadonlyArray<{ name: string; description: string }> = [],
+): void {
+  const skillNames = new Set(skills.map((s) => s.name));
+  const skillCommands = skills.map((s) => ({
+    name: s.name,
+    description: s.description,
+    input: { hint: "[args]" } as const,
+  }));
+  const slashCommands = SLASH_COMMANDS.filter((c) => !skillNames.has(c.cmd)).map((c) => ({
+    name: c.cmd,
+    description: c.summary,
+    ...(c.argsHint ? { input: { hint: c.argsHint } } : {}),
+  }));
+
+  server.sendNotification("session/update", {
+    sessionId,
+    update: {
+      sessionUpdate: "available_commands_update",
+      availableCommands: [...skillCommands, ...slashCommands],
+    },
+  } satisfies SessionUpdateParams);
+}
 
 function tryParseJson(raw: string): unknown {
   if (!raw) return undefined;

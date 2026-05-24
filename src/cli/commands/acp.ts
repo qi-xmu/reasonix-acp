@@ -3,7 +3,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { type WriteStream, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { dispatchKernelEvent } from "../../acp/dispatch.js";
+import { dispatchKernelEvent, sendAvailableCommands } from "../../acp/dispatch.js";
 import { requestPermissionForGate } from "../../acp/gates.js";
 import {
   ACP_PROTOCOL_VERSION,
@@ -12,11 +12,16 @@ import {
   type InitializeParams,
   type InitializeResult,
   type SessionCancelParams,
+  type SessionCloseParams,
+  type SessionCloseResult,
+  type SessionListParams,
+  type SessionListResult,
   type SessionNewParams,
   type SessionNewResult,
   type SessionPromptParams,
   type SessionPromptResult,
   type SessionUpdateParams,
+  type SkillResolver,
   type StopReason,
   flattenPrompt,
 } from "../../acp/protocol.js";
@@ -43,6 +48,7 @@ import { preflightStdioSpec } from "../../mcp/preflight.js";
 import { bridgeMcpTools } from "../../mcp/registry.js";
 import { buildTransportFromSpec } from "../../mcp/transport-from-spec.js";
 import { timestampSuffix } from "../../memory/session.js";
+import { SkillStore } from "../../skills.js";
 import { openTranscriptFile, recordFromLoopEvent, writeRecord } from "../../transcript/log.js";
 import { VERSION } from "../../version.js";
 import { formatMcpLifecycleEvent } from "../ui/mcp-lifecycle.js";
@@ -71,6 +77,8 @@ interface Session {
   eventizer: Eventizer;
   ctx: { model: string; prefixHash: string; reasoningEffort: "high" | "max" };
   aborter: AbortController | null;
+  skillStore: SkillStore;
+  skillResolver: SkillResolver;
 }
 
 function resolveMcpPrefix(
@@ -158,6 +166,13 @@ async function buildSession(opts: {
   const resolved = resolvePreset(preset);
   const model = opts.modelOverride || resolved.model;
   const toolset = await buildCodeToolset({ rootDir: opts.rootDir });
+  const skillStore = new SkillStore({ projectRoot: opts.rootDir });
+  const skillResolver: SkillResolver = {
+    read(name: string) {
+      const skill = skillStore.read(name);
+      return skill ? { name: skill.name, body: skill.body } : undefined;
+    },
+  };
   // Bridge MCP tools BEFORE building the prefix so their specs make it into the cache key.
   const mcpClients = await loadMcpServers(
     toolset.tools,
@@ -193,6 +208,8 @@ async function buildSession(opts: {
       reasoningEffort: loadReasoningEffort(),
     },
     aborter: null,
+    skillStore,
+    skillResolver,
   };
 }
 
@@ -246,6 +263,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
         loadSession: false,
         promptCapabilities: { image: false, audio: false, embeddedContext: true },
         mcpCapabilities: { http: false, sse: false },
+        sessionCapabilities: { close: {}, list: {} },
       },
       agentInfo: { name: "reasonix", title: "Reasonix", version: VERSION },
       authMethods: [],
@@ -262,7 +280,13 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
       mcpPrefix: opts.mcpPrefix,
     });
     sessions.set(session.id, session);
-    return { sessionId: session.id };
+    const sid = session.id;
+    const skills = session.skillStore
+      .list()
+      .map((s) => ({ name: s.name, description: s.description }));
+    // Defer to next tick so the session/new response is written before the notification.
+    setImmediate(() => sendAvailableCommands(server, sid, skills));
+    return { sessionId: sid };
   });
 
   server.onRequest<SessionPromptParams, SessionPromptResult>("session/prompt", async (params) => {
@@ -277,7 +301,7 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
         code: ERR_INVALID_PARAMS,
       });
     }
-    const text = flattenPrompt(params.prompt as ContentBlock[]);
+    const text = flattenPrompt(params.prompt as ContentBlock[], session.skillResolver);
     if (!text) {
       throw Object.assign(new Error("session/prompt: empty prompt"), { code: ERR_INVALID_PARAMS });
     }
@@ -325,6 +349,29 @@ export async function acpCommand(opts: AcpOptions): Promise<void> {
   server.onNotification<SessionCancelParams>("session/cancel", (params) => {
     const session = params?.sessionId ? sessions.get(params.sessionId) : undefined;
     session?.aborter?.abort();
+  });
+
+  server.onRequest<SessionCloseParams, SessionCloseResult>("session/close", async (params) => {
+    if (!params?.sessionId) {
+      throw Object.assign(new Error("session/close: missing sessionId"), {
+        code: ERR_INVALID_PARAMS,
+      });
+    }
+    const session = sessions.get(params.sessionId);
+    if (session) {
+      session.aborter?.abort();
+      await Promise.all(session.mcpClients.map((c) => c.close().catch(() => undefined)));
+      sessions.delete(params.sessionId);
+    }
+    return {};
+  });
+
+  server.onRequest<SessionListParams, SessionListResult>("session/list", async () => {
+    const list = [...sessions.entries()].map(([id, s]) => ({
+      sessionId: id,
+      cwd: s.rootDir,
+    }));
+    return { sessions: list };
   });
 
   try {

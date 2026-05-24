@@ -176,7 +176,11 @@ export type SessionUpdate =
     }
   | {
       sessionUpdate: "available_commands_update";
-      availableCommands: Array<{ name: string; description: string }>;
+      availableCommands: Array<{
+        name: string;
+        description: string;
+        input?: { hint: string } | null;
+      }>;
     }
   | {
       sessionUpdate: "current_mode_update";
@@ -431,12 +435,35 @@ export const ERR_RESOURCE_NOT_FOUND = -32002;
 
 // ── Helpers ─────────────────────────────────────────────────
 
-/** Extract the user prompt text out of ACP content blocks. Resource blocks contribute their inline `text` if present. */
-export function flattenPrompt(blocks: ContentBlock[]): string {
+/** Minimal resolver for /skillName expansion — pass a SkillStore or any object with `read`. */
+export interface SkillResolver {
+  read(name: string): { name: string; body: string } | undefined;
+}
+
+/** Extract the user prompt text out of ACP content blocks.
+ *  If `skillResolver` is provided, a leading `/skillName` prefix is expanded:
+ *  the skill body is prepended and trailing text becomes the task argument. */
+export function flattenPrompt(blocks: ContentBlock[], skillResolver?: SkillResolver): string {
   const parts: string[] = [];
   for (const b of blocks) {
     if (b.type === "text") parts.push(b.text);
     else if (b.type === "resource" && b.resource.text) parts.push(b.resource.text);
   }
-  return parts.join("\n\n").trim();
+  let text = parts.join("\n\n").trim();
+
+  if (skillResolver && text.startsWith("/")) {
+    const match = /^\/(\S+)(?:\s+(.*))?/s.exec(text);
+    if (match) {
+      const name = match[1]!;
+      const args = (match[2] ?? "").trim();
+      const skill = skillResolver.read(name);
+      if (skill) {
+        const expanded = [`[skill: ${skill.name}]`, skill.body];
+        if (args) expanded.push(`Task: ${args}`);
+        text = expanded.join("\n");
+      }
+    }
+  }
+
+  return text;
 }
